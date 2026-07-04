@@ -1,12 +1,14 @@
 /**
  * Unit Tests: Navbar Component
  * Tests navigation links, element IDs, and auth state display.
+ * Dummy data is generated dynamically via factories (mirrors real API shape).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
+import { makeUser } from '../factories';
 
 // ─── Mock react-router-dom navigate ──────────────────────────────────────────
 const mockNavigate = vi.fn();
@@ -60,11 +62,12 @@ describe('Navbar Component', () => {
   });
 
   describe('Authenticated Customer State', () => {
+    let customer: ReturnType<typeof makeUser>;
+
     beforeEach(() => {
+      customer = makeUser({ role: 'customer' });
       localStorage.setItem('token', 'fake-token');
-      localStorage.setItem('user', JSON.stringify({
-        id: 1, name: 'Budi Santoso', email: 'user1@spacebook.id', role: 'customer',
-      }));
+      localStorage.setItem('user', JSON.stringify(customer));
     });
 
     it('shows "My Bookings" nav link for customers', () => {
@@ -107,11 +110,12 @@ describe('Navbar Component', () => {
   });
 
   describe('Authenticated Admin State', () => {
+    let admin: ReturnType<typeof makeUser>;
+
     beforeEach(() => {
+      admin = makeUser({ role: 'admin' });
       localStorage.setItem('token', 'admin-token');
-      localStorage.setItem('user', JSON.stringify({
-        id: 1, name: 'Admin SpaceBook', email: 'admin@spacebook.id', role: 'admin',
-      }));
+      localStorage.setItem('user', JSON.stringify(admin));
     });
 
     it('shows "Admin Dashboard" nav link for admins', () => {
@@ -153,19 +157,17 @@ describe('Navbar Component', () => {
     });
 
     it('shows user name in dropdown when logged in as customer', () => {
+      const customer = makeUser({ role: 'customer' });
       localStorage.setItem('token', 'fake-token');
-      localStorage.setItem('user', JSON.stringify({
-        id: 1, name: 'Budi Santoso', email: 'user1@spacebook.id', role: 'customer',
-      }));
+      localStorage.setItem('user', JSON.stringify(customer));
       renderNavbar();
-      expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
+      expect(screen.getByText(customer.name)).toBeInTheDocument();
     });
 
     it('shows "Signed in as" label in dropdown', () => {
+      const customer = makeUser({ role: 'customer' });
       localStorage.setItem('token', 'fake-token');
-      localStorage.setItem('user', JSON.stringify({
-        id: 1, name: 'Budi Santoso', email: 'user1@spacebook.id', role: 'customer',
-      }));
+      localStorage.setItem('user', JSON.stringify(customer));
       renderNavbar();
       const dropdownBtn = document.getElementById('btn-profile-dropdown') as HTMLButtonElement;
       fireEvent.click(dropdownBtn);

@@ -1,13 +1,16 @@
 /**
  * Unit Tests: Register Page
  * Tests form rendering, input IDs for automation, and registration flow.
+ * Dummy data is generated dynamically via factories (mirrors real API shape).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { faker } from '@faker-js/faker';
 import { MemoryRouter } from 'react-router-dom';
 import Register from '../../pages/Register';
+import { makeAuthPayload } from '../factories';
 
 // ─── Mock api module ──────────────────────────────────────────────────────────
 vi.mock('../../lib/api', () => ({
@@ -104,25 +107,30 @@ describe('Register Page', () => {
   describe('Form Interactions', () => {
     it('updates all fields when user types', async () => {
       renderRegister();
+      const name = faker.person.fullName();
+      const email = faker.internet.email();
+      const password = faker.internet.password({ length: 12 });
+
       const nameInput = document.getElementById('register-name') as HTMLInputElement;
       const emailInput = document.getElementById('register-email') as HTMLInputElement;
       const pwInput = document.getElementById('register-password') as HTMLInputElement;
 
-      await userEvent.type(nameInput, 'John Doe');
-      await userEvent.type(emailInput, 'john@example.com');
-      await userEvent.type(pwInput, 'securepassword');
+      await userEvent.type(nameInput, name);
+      await userEvent.type(emailInput, email);
+      await userEvent.type(pwInput, password);
 
-      expect(nameInput.value).toBe('John Doe');
-      expect(emailInput.value).toBe('john@example.com');
-      expect(pwInput.value).toBe('securepassword');
+      expect(nameInput.value).toBe(name);
+      expect(emailInput.value).toBe(email);
+      expect(pwInput.value).toBe(password);
     });
   });
 
   describe('Form Submission', () => {
     it('shows error when email is already in use', async () => {
       const api = await import('../../lib/api');
+      const errorMessage = faker.lorem.sentence();
       (api.default.post as any).mockRejectedValue({
-        response: { data: { message: 'Email is already registered.' } },
+        response: { data: { message: errorMessage } },
       });
 
       renderRegister();
@@ -131,24 +139,20 @@ describe('Register Page', () => {
       const pwInput = document.getElementById('register-password') as HTMLInputElement;
       const submitBtn = document.getElementById('btn-register-submit') as HTMLButtonElement;
 
-      await userEvent.type(nameInput, 'Existing User');
-      await userEvent.type(emailInput, 'existing@example.com');
-      await userEvent.type(pwInput, 'password123');
+      await userEvent.type(nameInput, faker.person.fullName());
+      await userEvent.type(emailInput, faker.internet.email());
+      await userEvent.type(pwInput, faker.internet.password({ length: 12 }));
       fireEvent.click(submitBtn);
 
       await waitFor(() => {
-        expect(screen.getByText('Email is already registered.')).toBeInTheDocument();
+        expect(screen.getByText(errorMessage)).toBeInTheDocument();
       });
     });
 
     it('stores token and user in localStorage on successful registration', async () => {
       const api = await import('../../lib/api');
-      (api.default.post as any).mockResolvedValue({
-        data: {
-          token: 'new-user-token',
-          user: { id: 42, name: 'New User', email: 'new@example.com', role: 'customer' },
-        },
-      });
+      const authPayload = makeAuthPayload({ user: { role: 'customer' } as any });
+      (api.default.post as any).mockResolvedValue({ data: authPayload });
 
       renderRegister();
       const nameInput = document.getElementById('register-name') as HTMLInputElement;
@@ -156,13 +160,13 @@ describe('Register Page', () => {
       const pwInput = document.getElementById('register-password') as HTMLInputElement;
       const submitBtn = document.getElementById('btn-register-submit') as HTMLButtonElement;
 
-      await userEvent.type(nameInput, 'New User');
-      await userEvent.type(emailInput, 'new@example.com');
-      await userEvent.type(pwInput, 'password123');
+      await userEvent.type(nameInput, authPayload.user.name);
+      await userEvent.type(emailInput, authPayload.user.email);
+      await userEvent.type(pwInput, faker.internet.password({ length: 12 }));
       fireEvent.click(submitBtn);
 
       await waitFor(() => {
-        expect(localStorage.getItem('token')).toBe('new-user-token');
+        expect(localStorage.getItem('token')).toBe(authPayload.token);
       });
     });
 
@@ -176,9 +180,9 @@ describe('Register Page', () => {
       const pwInput = document.getElementById('register-password') as HTMLInputElement;
       const submitBtn = document.getElementById('btn-register-submit') as HTMLButtonElement;
 
-      await userEvent.type(nameInput, 'User');
-      await userEvent.type(emailInput, 'user@example.com');
-      await userEvent.type(pwInput, 'password');
+      await userEvent.type(nameInput, faker.person.fullName());
+      await userEvent.type(emailInput, faker.internet.email());
+      await userEvent.type(pwInput, faker.internet.password({ length: 12 }));
       fireEvent.click(submitBtn);
 
       await waitFor(() => {

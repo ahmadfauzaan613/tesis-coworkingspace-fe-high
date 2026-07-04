@@ -1,6 +1,7 @@
 /**
  * Unit Tests: Profile Page
  * Tests element IDs for automation, form rendering, and input interactions.
+ * Dummy data is generated dynamically via factories (mirrors real API shape).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -9,6 +10,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import Profile from '../../pages/Profile';
+import { makeUser } from '../factories';
 
 // ─── Mock api ─────────────────────────────────────────────────────────────────
 vi.mock('../../lib/api', () => ({
@@ -18,14 +20,6 @@ vi.mock('../../lib/api', () => ({
     post: vi.fn(),
   },
 }));
-
-const mockProfile = {
-  id: 1,
-  name: 'Budi Santoso',
-  email: 'user1@spacebook.id',
-  role: 'customer',
-  avatar_url: null,
-};
 
 const createQueryClient = () =>
   new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -41,8 +35,11 @@ const renderProfile = (client = createQueryClient()) =>
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 describe('Profile Page', () => {
+  let mockProfile: ReturnType<typeof makeUser>;
+
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockProfile = makeUser({ role: 'customer', avatar_url: null });
     localStorage.setItem('token', 'fake-token');
     localStorage.setItem('user', JSON.stringify(mockProfile));
 
@@ -164,7 +161,7 @@ describe('Profile Page', () => {
       renderProfile();
       await waitFor(() => {
         const nameInput = document.getElementById('input-profile-name') as HTMLInputElement;
-        expect(nameInput?.value).toBe('Budi Santoso');
+        expect(nameInput?.value).toBe(mockProfile.name);
       });
     });
 
@@ -172,7 +169,7 @@ describe('Profile Page', () => {
       renderProfile();
       await waitFor(() => {
         const emailInput = document.getElementById('input-profile-email') as HTMLInputElement;
-        expect(emailInput?.value).toBe('user1@spacebook.id');
+        expect(emailInput?.value).toBe(mockProfile.email);
       });
     });
   });
@@ -183,14 +180,15 @@ describe('Profile Page', () => {
       // Wait for form to populate from API
       await waitFor(() => {
         const nameInput = document.getElementById('input-profile-name') as HTMLInputElement;
-        expect(nameInput?.value).toBe('Budi Santoso');
+        expect(nameInput?.value).toBe(mockProfile.name);
       });
 
+      const updatedName = `${mockProfile.name} Updated`;
       const nameInput = document.getElementById('input-profile-name') as HTMLInputElement;
       // Clear then type new value
       await userEvent.clear(nameInput);
-      await userEvent.type(nameInput, 'Budi Updated');
-      expect(nameInput.value).toBe('Budi Updated');
+      await userEvent.type(nameInput, updatedName);
+      expect(nameInput.value).toBe(updatedName);
     });
 
     it('submit profile button is present and enabled by default', async () => {

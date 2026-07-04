@@ -1,13 +1,16 @@
 /**
  * Unit Tests: MyBookings Page
  * Tests element IDs for automation, booking card rendering, and cancel/pay buttons.
+ * Dummy data is generated dynamically via factories (mirrors real API shape).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
+import { faker } from '@faker-js/faker';
 import MyBookings from '../../pages/MyBookings';
+import { makeMyBooking, makeUser } from '../factories';
 
 // ─── Mock api ─────────────────────────────────────────────────────────────────
 vi.mock('../../lib/api', () => ({
@@ -17,39 +20,14 @@ vi.mock('../../lib/api', () => ({
   },
 }));
 
-const mockBookings = [
-  {
-    id: 10,
-    room_id: 1,
-    date: '2026-12-01',
-    start_time: '09:00:00',
-    end_time: '12:00:00',
-    total_price: '150000',
-    status: 'pending',
-    created_at: '2026-11-01T10:00:00Z',
-    room_name: 'Focus Pod',
-    room_image: null,
-    price_per_hour: '50000',
-    payment_order_id: null,
-    payment_snap_token: null,
-    payment_status: null,
-  },
-  {
-    id: 11,
-    room_id: 2,
-    date: '2026-12-02',
-    start_time: '13:00:00',
-    end_time: '15:00:00',
-    total_price: '300000',
+const buildMockBookings = () => [
+  makeMyBooking({ status: 'pending', payment_status: null }),
+  makeMyBooking({
     status: 'approved',
-    created_at: '2026-11-01T11:00:00Z',
-    room_name: 'Meeting Room A',
-    room_image: null,
-    price_per_hour: '150000',
-    payment_order_id: 'ORDER-11-123',
-    payment_snap_token: 'SNAP-TOKEN',
     payment_status: 'settled',
-  },
+    payment_order_id: `ORDER-${faker.string.alphanumeric(8).toUpperCase()}`,
+    payment_snap_token: faker.string.alphanumeric(16),
+  }),
 ];
 
 const createQueryClient = () =>
@@ -67,32 +45,33 @@ const renderMyBookings = (client = createQueryClient()) =>
 describe('MyBookings Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    const user = makeUser({ role: 'customer' });
     localStorage.setItem('token', 'fake-token');
-    localStorage.setItem('user', JSON.stringify({
-      id: 1, name: 'Test User', email: 'test@spacebook.id', role: 'customer',
-    }));
+    localStorage.setItem('user', JSON.stringify(user));
   });
 
   describe('Element IDs for Automation', () => {
     it('renders pay button with id="btn-pay-booking-{id}" for pending bookings', async () => {
+      const mockBookings = buildMockBookings();
       const api = await import('../../lib/api');
       (api.default.get as any).mockResolvedValue({ data: mockBookings });
 
       renderMyBookings();
       await waitFor(() => {
         // Pending booking should show pay button
-        expect(document.getElementById('btn-pay-booking-10')).toBeInTheDocument();
+        expect(document.getElementById(`btn-pay-booking-${mockBookings[0].id}`)).toBeInTheDocument();
       });
     });
 
     it('renders cancel button with id="btn-cancel-booking-{id}" for cancellable bookings', async () => {
+      const mockBookings = buildMockBookings();
       const api = await import('../../lib/api');
       (api.default.get as any).mockResolvedValue({ data: mockBookings });
 
       renderMyBookings();
       await waitFor(() => {
         // Pending and unpaid should show cancel button
-        expect(document.getElementById('btn-cancel-booking-10')).toBeInTheDocument();
+        expect(document.getElementById(`btn-cancel-booking-${mockBookings[0].id}`)).toBeInTheDocument();
       });
     });
 
@@ -107,15 +86,16 @@ describe('MyBookings Page', () => {
     });
 
     it('renders confirm modal buttons with correct IDs', async () => {
+      const mockBookings = buildMockBookings();
       const api = await import('../../lib/api');
       (api.default.get as any).mockResolvedValue({ data: mockBookings });
 
       renderMyBookings();
       await waitFor(() => {
-        expect(document.getElementById('btn-cancel-booking-10')).toBeInTheDocument();
+        expect(document.getElementById(`btn-cancel-booking-${mockBookings[0].id}`)).toBeInTheDocument();
       });
 
-      fireEvent.click(document.getElementById('btn-cancel-booking-10')!);
+      fireEvent.click(document.getElementById(`btn-cancel-booking-${mockBookings[0].id}`)!);
 
       await waitFor(() => {
         expect(document.getElementById('btn-confirm-modal-cancel')).toBeInTheDocument();
@@ -125,7 +105,10 @@ describe('MyBookings Page', () => {
   });
 
   describe('Booking Status Rendering', () => {
+    let mockBookings: ReturnType<typeof buildMockBookings>;
+
     beforeEach(async () => {
+      mockBookings = buildMockBookings();
       const api = await import('../../lib/api');
       (api.default.get as any).mockResolvedValue({ data: mockBookings });
     });
@@ -161,16 +144,17 @@ describe('MyBookings Page', () => {
 
   describe('Cancel Booking Flow', () => {
     it('closes confirm modal when "Tidak" button is clicked', async () => {
+      const mockBookings = buildMockBookings();
       const api = await import('../../lib/api');
       (api.default.get as any).mockResolvedValue({ data: mockBookings });
 
       renderMyBookings();
       await waitFor(() => {
-        expect(document.getElementById('btn-cancel-booking-10')).toBeInTheDocument();
+        expect(document.getElementById(`btn-cancel-booking-${mockBookings[0].id}`)).toBeInTheDocument();
       });
 
       // Open confirm modal
-      fireEvent.click(document.getElementById('btn-cancel-booking-10')!);
+      fireEvent.click(document.getElementById(`btn-cancel-booking-${mockBookings[0].id}`)!);
       await waitFor(() => {
         expect(document.getElementById('btn-confirm-modal-cancel')).toBeInTheDocument();
       });
@@ -185,19 +169,25 @@ describe('MyBookings Page', () => {
 
   describe('Mock Payment Modal', () => {
     it('renders mock payment modal buttons with correct IDs', async () => {
+      const mockBookings = buildMockBookings();
       const api = await import('../../lib/api');
       (api.default.get as any).mockResolvedValue({ data: mockBookings });
       // Simulate mock payment response
       (api.default.post as any).mockResolvedValue({
-        data: { snapToken: 'MOCK-SNAP-TOKEN', isMock: true, orderId: 'ORDER-10', amount: 150000 },
+        data: {
+          snapToken: 'MOCK-SNAP-TOKEN',
+          isMock: true,
+          orderId: `ORDER-${mockBookings[0].id}`,
+          amount: parseFloat(mockBookings[0].total_price),
+        },
       });
 
       renderMyBookings();
       await waitFor(() => {
-        expect(document.getElementById('btn-pay-booking-10')).toBeInTheDocument();
+        expect(document.getElementById(`btn-pay-booking-${mockBookings[0].id}`)).toBeInTheDocument();
       });
 
-      fireEvent.click(document.getElementById('btn-pay-booking-10')!);
+      fireEvent.click(document.getElementById(`btn-pay-booking-${mockBookings[0].id}`)!);
 
       await waitFor(() => {
         expect(document.getElementById('btn-mock-payment-cancel')).toBeInTheDocument();

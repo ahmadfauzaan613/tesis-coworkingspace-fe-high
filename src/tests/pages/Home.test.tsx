@@ -1,6 +1,7 @@
 /**
  * Unit Tests: Home Page
  * Tests element IDs for automation and key UI rendering.
+ * Dummy data is generated dynamically via factories (mirrors real API shape).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -8,6 +9,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import Home from '../../pages/Home';
+import { makeRoom } from '../factories';
 
 // ─── Mock api ─────────────────────────────────────────────────────────────────
 vi.mock('../../lib/api', () => ({
@@ -17,24 +19,7 @@ vi.mock('../../lib/api', () => ({
   },
 }));
 
-const mockRooms = [
-  {
-    id: 1,
-    name: 'Focus Pod',
-    description: 'Quiet solo desk',
-    capacity: 1,
-    price_per_hour: '50000',
-    image_url: null,
-  },
-  {
-    id: 2,
-    name: 'Meeting Room A',
-    description: 'Conference room',
-    capacity: 10,
-    price_per_hour: '150000',
-    image_url: null,
-  },
-];
+const buildMockRooms = () => [makeRoom({ capacity: 1 }), makeRoom({ capacity: 10 })];
 
 const createQueryClient = () =>
   new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -70,18 +55,22 @@ describe('Home Page', () => {
   });
 
   describe('Booking Modal IDs', () => {
+    let mockRooms: ReturnType<typeof buildMockRooms>;
+
     beforeEach(async () => {
+      mockRooms = buildMockRooms();
       const api = await import('../../lib/api');
       (api.default.get as any).mockResolvedValue({ data: mockRooms });
     });
 
     it('opens booking modal when Book Space is clicked', async () => {
       renderHome();
+      const targetId = `btn-book-room-${mockRooms[0].id}`;
       await waitFor(() => {
-        expect(document.getElementById('btn-book-room-1')).toBeInTheDocument();
+        expect(document.getElementById(targetId)).toBeInTheDocument();
       });
 
-      fireEvent.click(document.getElementById('btn-book-room-1')!);
+      fireEvent.click(document.getElementById(targetId)!);
       await waitFor(() => {
         expect(document.getElementById('booking-form')).toBeInTheDocument();
       });
@@ -89,11 +78,12 @@ describe('Home Page', () => {
 
     it('modal has date input with id="input-booking-date"', async () => {
       renderHome();
+      const targetId = `btn-book-room-${mockRooms[0].id}`;
       await waitFor(() => {
-        expect(document.getElementById('btn-book-room-1')).toBeInTheDocument();
+        expect(document.getElementById(targetId)).toBeInTheDocument();
       });
 
-      fireEvent.click(document.getElementById('btn-book-room-1')!);
+      fireEvent.click(document.getElementById(targetId)!);
       await waitFor(() => {
         expect(document.getElementById('input-booking-date')).toBeInTheDocument();
       });
@@ -101,11 +91,12 @@ describe('Home Page', () => {
 
     it('modal has start time select with id="select-start-time"', async () => {
       renderHome();
+      const targetId = `btn-book-room-${mockRooms[0].id}`;
       await waitFor(() => {
-        expect(document.getElementById('btn-book-room-1')).toBeInTheDocument();
+        expect(document.getElementById(targetId)).toBeInTheDocument();
       });
 
-      fireEvent.click(document.getElementById('btn-book-room-1')!);
+      fireEvent.click(document.getElementById(targetId)!);
       await waitFor(() => {
         expect(document.getElementById('select-start-time')).toBeInTheDocument();
       });
@@ -113,11 +104,12 @@ describe('Home Page', () => {
 
     it('modal has end time select with id="select-end-time"', async () => {
       renderHome();
+      const targetId = `btn-book-room-${mockRooms[0].id}`;
       await waitFor(() => {
-        expect(document.getElementById('btn-book-room-1')).toBeInTheDocument();
+        expect(document.getElementById(targetId)).toBeInTheDocument();
       });
 
-      fireEvent.click(document.getElementById('btn-book-room-1')!);
+      fireEvent.click(document.getElementById(targetId)!);
       await waitFor(() => {
         expect(document.getElementById('select-end-time')).toBeInTheDocument();
       });
@@ -125,11 +117,12 @@ describe('Home Page', () => {
 
     it('closes modal when btn-close-modal is clicked', async () => {
       renderHome();
+      const targetId = `btn-book-room-${mockRooms[0].id}`;
       await waitFor(() => {
-        expect(document.getElementById('btn-book-room-1')).toBeInTheDocument();
+        expect(document.getElementById(targetId)).toBeInTheDocument();
       });
 
-      fireEvent.click(document.getElementById('btn-book-room-1')!);
+      fireEvent.click(document.getElementById(targetId)!);
       await waitFor(() => {
         expect(document.getElementById('booking-form')).toBeInTheDocument();
       });
@@ -142,11 +135,12 @@ describe('Home Page', () => {
 
     it('shows Login/Register buttons in modal for unauthenticated users', async () => {
       renderHome();
+      const targetId = `btn-book-room-${mockRooms[0].id}`;
       await waitFor(() => {
-        expect(document.getElementById('btn-book-room-1')).toBeInTheDocument();
+        expect(document.getElementById(targetId)).toBeInTheDocument();
       });
 
-      fireEvent.click(document.getElementById('btn-book-room-1')!);
+      fireEvent.click(document.getElementById(targetId)!);
       await waitFor(() => {
         expect(document.getElementById('btn-modal-login')).toBeInTheDocument();
         expect(document.getElementById('btn-modal-register')).toBeInTheDocument();
@@ -157,11 +151,12 @@ describe('Home Page', () => {
       localStorage.setItem('token', 'fake-jwt-token');
 
       renderHome();
+      const targetId = `btn-book-room-${mockRooms[0].id}`;
       await waitFor(() => {
-        expect(document.getElementById('btn-book-room-1')).toBeInTheDocument();
+        expect(document.getElementById(targetId)).toBeInTheDocument();
       });
 
-      fireEvent.click(document.getElementById('btn-book-room-1')!);
+      fireEvent.click(document.getElementById(targetId)!);
       await waitFor(() => {
         expect(document.getElementById('btn-confirm-booking')).toBeInTheDocument();
       });

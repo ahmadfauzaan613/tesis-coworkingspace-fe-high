@@ -1,13 +1,16 @@
 /**
  * Unit Tests: Login Page
  * Tests form rendering, input IDs for automation, and user interactions.
+ * Dummy data is generated dynamically via factories (mirrors real API shape).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { faker } from '@faker-js/faker';
 import { MemoryRouter } from 'react-router-dom';
 import Login from '../../pages/Login';
+import { makeAuthPayload } from '../factories';
 
 // ─── Mock api module ──────────────────────────────────────────────────────────
 vi.mock('../../lib/api', () => ({
@@ -105,16 +108,18 @@ describe('Login Page', () => {
   describe('Form Interactions', () => {
     it('updates email input when user types', async () => {
       renderLogin();
+      const email = faker.internet.email();
       const emailInput = document.getElementById('login-email') as HTMLInputElement;
-      await userEvent.type(emailInput, 'test@example.com');
-      expect(emailInput.value).toBe('test@example.com');
+      await userEvent.type(emailInput, email);
+      expect(emailInput.value).toBe(email);
     });
 
     it('updates password input when user types', async () => {
       renderLogin();
+      const password = faker.internet.password({ length: 12 });
       const pwInput = document.getElementById('login-password') as HTMLInputElement;
-      await userEvent.type(pwInput, 'password123');
-      expect(pwInput.value).toBe('password123');
+      await userEvent.type(pwInput, password);
+      expect(pwInput.value).toBe(password);
     });
 
     it('demo autofill button fills in email and password', async () => {
@@ -144,8 +149,8 @@ describe('Login Page', () => {
       const pwInput = document.getElementById('login-password') as HTMLInputElement;
       const submitBtn = document.getElementById('btn-login-submit') as HTMLButtonElement;
 
-      await userEvent.type(emailInput, 'test@example.com');
-      await userEvent.type(pwInput, 'password123');
+      await userEvent.type(emailInput, faker.internet.email());
+      await userEvent.type(pwInput, faker.internet.password({ length: 12 }));
       fireEvent.click(submitBtn);
 
       await waitFor(() => {
@@ -155,8 +160,9 @@ describe('Login Page', () => {
 
     it('shows error message on failed login', async () => {
       const api = await import('../../lib/api');
+      const errorMessage = faker.lorem.sentence();
       (api.default.post as any).mockRejectedValue({
-        response: { data: { message: 'Incorrect email or password.' } },
+        response: { data: { message: errorMessage } },
       });
 
       renderLogin();
@@ -164,35 +170,31 @@ describe('Login Page', () => {
       const pwInput = document.getElementById('login-password') as HTMLInputElement;
       const submitBtn = document.getElementById('btn-login-submit') as HTMLButtonElement;
 
-      await userEvent.type(emailInput, 'wrong@example.com');
-      await userEvent.type(pwInput, 'wrongpass');
+      await userEvent.type(emailInput, faker.internet.email());
+      await userEvent.type(pwInput, faker.internet.password({ length: 12 }));
       fireEvent.click(submitBtn);
 
       await waitFor(() => {
-        expect(screen.getByText('Incorrect email or password.')).toBeInTheDocument();
+        expect(screen.getByText(errorMessage)).toBeInTheDocument();
       });
     });
 
     it('stores token and user in localStorage on successful login', async () => {
       const api = await import('../../lib/api');
-      (api.default.post as any).mockResolvedValue({
-        data: {
-          token: 'test-jwt-token',
-          user: { id: 1, name: 'Test User', email: 'user@test.com', role: 'customer' },
-        },
-      });
+      const authPayload = makeAuthPayload({ user: { role: 'customer' } as any });
+      (api.default.post as any).mockResolvedValue({ data: authPayload });
 
       renderLogin();
       const emailInput = document.getElementById('login-email') as HTMLInputElement;
       const pwInput = document.getElementById('login-password') as HTMLInputElement;
       const submitBtn = document.getElementById('btn-login-submit') as HTMLButtonElement;
 
-      await userEvent.type(emailInput, 'user@test.com');
-      await userEvent.type(pwInput, 'password123');
+      await userEvent.type(emailInput, authPayload.user.email);
+      await userEvent.type(pwInput, faker.internet.password({ length: 12 }));
       fireEvent.click(submitBtn);
 
       await waitFor(() => {
-        expect(localStorage.getItem('token')).toBe('test-jwt-token');
+        expect(localStorage.getItem('token')).toBe(authPayload.token);
       });
     });
   });

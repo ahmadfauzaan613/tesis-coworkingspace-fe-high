@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { faker } from '@faker-js/faker';
 import { MemoryRouter } from 'react-router-dom';
 import Contacts from '../../pages/Contacts';
 
@@ -62,17 +63,21 @@ describe('Contacts Page', () => {
   describe('Form Interactions & Submission', () => {
     it('updates name, email, and message inputs when user types', async () => {
       renderContacts();
+      const name = faker.person.fullName();
+      const email = faker.internet.email();
+      const message = faker.lorem.sentence();
+
       const nameInput = document.getElementById('contact-name') as HTMLInputElement;
       const emailInput = document.getElementById('contact-email') as HTMLInputElement;
       const messageInput = document.getElementById('contact-message') as HTMLTextAreaElement;
 
-      await userEvent.type(nameInput, 'John Doe');
-      await userEvent.type(emailInput, 'john@example.com');
-      await userEvent.type(messageInput, 'Hello, I would like to book a meeting room.');
+      await userEvent.type(nameInput, name);
+      await userEvent.type(emailInput, email);
+      await userEvent.type(messageInput, message);
 
-      expect(nameInput.value).toBe('John Doe');
-      expect(emailInput.value).toBe('john@example.com');
-      expect(messageInput.value).toBe('Hello, I would like to book a meeting room.');
+      expect(nameInput.value).toBe(name);
+      expect(emailInput.value).toBe(email);
+      expect(messageInput.value).toBe(message);
     });
 
     it('shows success message and resets inputs after submitting the form', async () => {
@@ -82,9 +87,9 @@ describe('Contacts Page', () => {
       const messageInput = document.getElementById('contact-message') as HTMLTextAreaElement;
       const submitBtn = document.getElementById('btn-send-message') as HTMLButtonElement;
 
-      await userEvent.type(nameInput, 'Alice Smith');
-      await userEvent.type(emailInput, 'alice@example.com');
-      await userEvent.type(messageInput, 'Inquiry about pricing plans.');
+      await userEvent.type(nameInput, faker.person.fullName());
+      await userEvent.type(emailInput, faker.internet.email());
+      await userEvent.type(messageInput, faker.lorem.sentence());
 
       fireEvent.click(submitBtn);
 

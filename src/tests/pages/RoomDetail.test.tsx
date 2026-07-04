@@ -1,6 +1,7 @@
 /**
  * Unit Tests: RoomDetail Page
  * Tests element IDs for automation, booking form rendering, and modal interactions.
+ * Dummy data is generated dynamically via factories (mirrors real API shape).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -8,6 +9,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import RoomDetail from '../../pages/RoomDetail';
+import { makeRoom } from '../factories';
 
 // ─── Mock api ─────────────────────────────────────────────────────────────────
 vi.mock('../../lib/api', () => ({
@@ -22,15 +24,6 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return { ...actual, useParams: () => ({ id: '1' }) };
 });
-
-const mockRoom = {
-  id: 1,
-  name: 'Focus Pod',
-  description: 'A quiet, soundproof pod for solo deep work.',
-  capacity: 1,
-  price_per_hour: '50000',
-  image_url: null,
-};
 
 const createQueryClient = () =>
   new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -49,9 +42,12 @@ const renderRoomDetail = (client = createQueryClient()) =>
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 describe('RoomDetail Page', () => {
+  let mockRoom: ReturnType<typeof makeRoom>;
+
   beforeEach(async () => {
     vi.clearAllMocks();
     localStorage.clear();
+    mockRoom = makeRoom({ id: 1 });
 
     const api = await import('../../lib/api');
     (api.default.get as any).mockImplementation((url: string) => {
@@ -115,16 +111,14 @@ describe('RoomDetail Page', () => {
     it('renders room name from API data', async () => {
       renderRoomDetail();
       await waitFor(() => {
-        expect(screen.getByText('Focus Pod')).toBeInTheDocument();
+        expect(screen.getByText(mockRoom.name)).toBeInTheDocument();
       });
     });
 
     it('renders room description from API data', async () => {
       renderRoomDetail();
       await waitFor(() => {
-        // Use getAllByText since "soundproof" appears in both description and amenity list
-        const matches = screen.getAllByText(/soundproof/i);
-        expect(matches.length).toBeGreaterThan(0);
+        expect(screen.getByText(mockRoom.description)).toBeInTheDocument();
       });
     });
   });

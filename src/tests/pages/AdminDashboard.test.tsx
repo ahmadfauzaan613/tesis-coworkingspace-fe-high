@@ -1,6 +1,7 @@
 /**
  * Unit Tests: AdminDashboard
  * Tests tab navigation IDs, room management IDs, booking action IDs.
+ * Dummy data is generated dynamically via factories (mirrors real API shape).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -8,6 +9,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import AdminDashboard from '../../pages/AdminDashboard';
+import { makeAdminStats, makeAllBooking, makeRoom, makeUser } from '../factories';
 
 // ─── Mock api ─────────────────────────────────────────────────────────────────
 vi.mock('../../lib/api', () => ({
@@ -19,48 +21,35 @@ vi.mock('../../lib/api', () => ({
   },
 }));
 
-const mockStats = {
-  summary: { bookings: 10, rooms: 4, users: 8, revenue: 2500000 },
-  statusStats: [
-    { status: 'pending', count: '3' },
-    { status: 'approved', count: '5' },
-    { status: 'cancelled', count: '2' },
-  ],
+const buildFixtures = () => {
+  const stats = makeAdminStats();
+  const rooms = [makeRoom(), makeRoom()];
+  const bookingUser = makeUser({ role: 'customer' });
+  const allBookings = [
+    makeAllBooking({
+      status: 'pending',
+      room_id: rooms[0].id,
+      room_name: rooms[0].name,
+      user_id: bookingUser.id,
+      user_name: bookingUser.name,
+      user_email: bookingUser.email,
+    }),
+  ];
+  return { stats, rooms, allBookings };
 };
-
-const mockRooms = [
-  { id: 1, name: 'Focus Pod', description: 'Quiet', capacity: 1, price_per_hour: '50000', image_url: null },
-  { id: 2, name: 'Meeting Room', description: 'Conference', capacity: 10, price_per_hour: '150000', image_url: null },
-];
-
-const mockAllBookings = [
-  {
-    id: 20,
-    user_id: 2,
-    room_id: 1,
-    date: '2026-12-01',
-    start_time: '09:00:00',
-    end_time: '12:00:00',
-    total_price: '150000',
-    status: 'pending',
-    created_at: '2026-11-01T10:00:00Z',
-    room_name: 'Focus Pod',
-    user_name: 'Budi Santoso',
-    user_email: 'user1@spacebook.id',
-    payment_order_id: null,
-    payment_status: null,
-  },
-];
 
 const createQueryClient = () =>
   new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-const renderAdmin = async (client = createQueryClient()) => {
+const renderAdmin = async (
+  fixtures: ReturnType<typeof buildFixtures>,
+  client = createQueryClient()
+) => {
   const api = await import('../../lib/api');
   (api.default.get as any).mockImplementation((url: string) => {
-    if (url.includes('/admin/stats')) return Promise.resolve({ data: mockStats });
-    if (url.includes('/rooms')) return Promise.resolve({ data: mockRooms });
-    if (url.includes('/bookings/admin/all')) return Promise.resolve({ data: mockAllBookings });
+    if (url.includes('/admin/stats')) return Promise.resolve({ data: fixtures.stats });
+    if (url.includes('/rooms')) return Promise.resolve({ data: fixtures.rooms });
+    if (url.includes('/bookings/admin/all')) return Promise.resolve({ data: fixtures.allBookings });
     return Promise.resolve({ data: [] });
   });
 
@@ -76,22 +65,21 @@ const renderAdmin = async (client = createQueryClient()) => {
 describe('AdminDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    const adminUser = makeUser({ role: 'admin' });
     localStorage.setItem('token', 'admin-token');
-    localStorage.setItem('user', JSON.stringify({
-      id: 1, name: 'Admin SpaceBook', email: 'admin@spacebook.id', role: 'admin',
-    }));
+    localStorage.setItem('user', JSON.stringify(adminUser));
   });
 
   describe('Tab Navigation IDs', () => {
     it('renders tab buttons with correct IDs', async () => {
-      await renderAdmin();
+      await renderAdmin(buildFixtures());
       expect(document.getElementById('tab-reports')).toBeInTheDocument();
       expect(document.getElementById('tab-rooms')).toBeInTheDocument();
       expect(document.getElementById('tab-bookings')).toBeInTheDocument();
     });
 
     it('switches to Rooms tab when tab-rooms is clicked', async () => {
-      await renderAdmin();
+      await renderAdmin(buildFixtures());
       fireEvent.click(document.getElementById('tab-rooms')!);
       await waitFor(() => {
         expect(document.getElementById('btn-create-room-trigger')).toBeInTheDocument();
@@ -99,17 +87,20 @@ describe('AdminDashboard', () => {
     });
 
     it('switches to Bookings tab when tab-bookings is clicked', async () => {
-      await renderAdmin();
+      const fixtures = buildFixtures();
+      await renderAdmin(fixtures);
       fireEvent.click(document.getElementById('tab-bookings')!);
       await waitFor(() => {
-        expect(document.getElementById('btn-approve-booking-20')).toBeInTheDocument();
+        expect(
+          document.getElementById(`btn-approve-booking-${fixtures.allBookings[0].id}`)
+        ).toBeInTheDocument();
       });
     });
   });
 
   describe('Reports Tab IDs', () => {
     it('renders CSV download button with id="btn-download-csv"', async () => {
-      await renderAdmin();
+      await renderAdmin(buildFixtures());
       await waitFor(() => {
         expect(document.getElementById('btn-download-csv')).toBeInTheDocument();
       });
@@ -118,49 +109,55 @@ describe('AdminDashboard', () => {
 
   describe('UI Content Rendering', () => {
     it('renders "Admin Dashboard" heading', async () => {
-      await renderAdmin();
+      await renderAdmin(buildFixtures());
       expect(screen.getByText(/Admin Control Portal/i)).toBeInTheDocument();
     });
 
     it('renders tab labels: Reports, Rooms, Bookings', async () => {
-      await renderAdmin();
+      await renderAdmin(buildFixtures());
       expect(document.getElementById('tab-reports')).toHaveTextContent(/Reports/i);
       expect(document.getElementById('tab-rooms')).toHaveTextContent(/Rooms/i);
       expect(document.getElementById('tab-bookings')).toHaveTextContent(/Bookings/i);
     });
 
     it('renders stat cards with summary data after load', async () => {
-      await renderAdmin();
+      const fixtures = buildFixtures();
+      await renderAdmin(fixtures);
       await waitFor(() => {
-        // Summary stats should be visible
-        expect(screen.getByText('10')).toBeInTheDocument(); // bookings count
-        expect(screen.getByText('4')).toBeInTheDocument();  // rooms count
-        expect(screen.getByText('8')).toBeInTheDocument();  // users count
+        const bookingsLabel = screen.getByText('Total Booking Requests');
+        const roomsLabel = screen.getByText('Active Workspace Rooms');
+        const usersLabel = screen.getByText('Registered Accounts');
+        expect(bookingsLabel.nextElementSibling).toHaveTextContent(String(fixtures.stats.summary.bookings));
+        expect(roomsLabel.nextElementSibling).toHaveTextContent(String(fixtures.stats.summary.rooms));
+        expect(usersLabel.nextElementSibling).toHaveTextContent(String(fixtures.stats.summary.users));
       });
     });
 
     it('renders room names in Rooms tab', async () => {
-      await renderAdmin();
+      const fixtures = buildFixtures();
+      await renderAdmin(fixtures);
       fireEvent.click(document.getElementById('tab-rooms')!);
       await waitFor(() => {
-        expect(screen.getByText('Focus Pod')).toBeInTheDocument();
-        expect(screen.getByText('Meeting Room')).toBeInTheDocument();
+        fixtures.rooms.forEach((room) => {
+          expect(screen.getByText(room.name)).toBeInTheDocument();
+        });
       });
     });
 
     it('renders booking user info in Bookings tab', async () => {
-      await renderAdmin();
+      const fixtures = buildFixtures();
+      await renderAdmin(fixtures);
       fireEvent.click(document.getElementById('tab-bookings')!);
       await waitFor(() => {
-        expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
-        expect(screen.getByText('Focus Pod')).toBeInTheDocument();
+        expect(screen.getByText(fixtures.allBookings[0].user_name)).toBeInTheDocument();
+        expect(screen.getByText(fixtures.allBookings[0].room_name)).toBeInTheDocument();
       });
     });
   });
 
   describe('Rooms Management IDs', () => {
     it('shows room create form when btn-create-room-trigger is clicked', async () => {
-      await renderAdmin();
+      await renderAdmin(buildFixtures());
       fireEvent.click(document.getElementById('tab-rooms')!);
       await waitFor(() => {
         expect(document.getElementById('btn-create-room-trigger')).toBeInTheDocument();
@@ -180,7 +177,7 @@ describe('AdminDashboard', () => {
     });
 
     it('hides form when btn-room-form-cancel is clicked', async () => {
-      await renderAdmin();
+      await renderAdmin(buildFixtures());
       fireEvent.click(document.getElementById('tab-rooms')!);
       await waitFor(() => {
         expect(document.getElementById('btn-create-room-trigger')).toBeInTheDocument();
@@ -198,35 +195,42 @@ describe('AdminDashboard', () => {
     });
 
     it('renders edit/delete buttons per room with correct IDs', async () => {
-      await renderAdmin();
+      const fixtures = buildFixtures();
+      await renderAdmin(fixtures);
       fireEvent.click(document.getElementById('tab-rooms')!);
       await waitFor(() => {
-        expect(document.getElementById('btn-edit-room-1')).toBeInTheDocument();
-        expect(document.getElementById('btn-delete-room-1')).toBeInTheDocument();
-        expect(document.getElementById('btn-edit-room-2')).toBeInTheDocument();
-        expect(document.getElementById('btn-delete-room-2')).toBeInTheDocument();
+        fixtures.rooms.forEach((room) => {
+          expect(document.getElementById(`btn-edit-room-${room.id}`)).toBeInTheDocument();
+          expect(document.getElementById(`btn-delete-room-${room.id}`)).toBeInTheDocument();
+        });
       });
     });
   });
 
   describe('Bookings Management IDs', () => {
     it('renders approve/reject buttons per pending booking', async () => {
-      await renderAdmin();
+      const fixtures = buildFixtures();
+      await renderAdmin(fixtures);
       fireEvent.click(document.getElementById('tab-bookings')!);
       await waitFor(() => {
-        expect(document.getElementById('btn-approve-booking-20')).toBeInTheDocument();
-        expect(document.getElementById('btn-reject-booking-20')).toBeInTheDocument();
+        expect(
+          document.getElementById(`btn-approve-booking-${fixtures.allBookings[0].id}`)
+        ).toBeInTheDocument();
+        expect(
+          document.getElementById(`btn-reject-booking-${fixtures.allBookings[0].id}`)
+        ).toBeInTheDocument();
       });
     });
 
     it('shows admin confirm modal when delete room is clicked', async () => {
-      await renderAdmin();
+      const fixtures = buildFixtures();
+      await renderAdmin(fixtures);
       fireEvent.click(document.getElementById('tab-rooms')!);
       await waitFor(() => {
-        expect(document.getElementById('btn-delete-room-1')).toBeInTheDocument();
+        expect(document.getElementById(`btn-delete-room-${fixtures.rooms[0].id}`)).toBeInTheDocument();
       });
 
-      fireEvent.click(document.getElementById('btn-delete-room-1')!);
+      fireEvent.click(document.getElementById(`btn-delete-room-${fixtures.rooms[0].id}`)!);
       await waitFor(() => {
         expect(document.getElementById('btn-admin-confirm-cancel')).toBeInTheDocument();
         expect(document.getElementById('btn-admin-confirm-ok')).toBeInTheDocument();
